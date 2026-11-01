@@ -1,17 +1,19 @@
 // Ajuste remoto para WhatsApp Web dentro de Kruzly (builds de prueba).
-// La app baja este archivo desde el repo público kruzly-webfixes y lo ejecuta
-// en la página. Edítalo ahí; en la app basta con tocar Recargar.
+// La app baja este archivo y lo ejecuta en la página. Después de editarlo,
+// en la app basta con tocar Recargar.
 //
-// v1: el login existe en el DOM pero su contenedor mide 0x0. Forzamos la
-// cadena de alturas y reportamos las medidas en consola (salen en el diagnóstico).
+// v2: el diagnóstico mostró que <body> y sus dos primeros <div> miden 0 px de
+// alto (overflow hidden), así que el login queda recortado. Forzamos la
+// cadena de alturas al alto de la ventana.
 (function () {
-  var V = 'v1';
+  var V = 'v2';
   if (window.__kruzlyFixVersion === V) return;
   window.__kruzlyFixVersion = V;
 
   var css = [
-    'html, body { height: 100% !important; min-height: 100% !important; margin: 0 !important; }',
-    '#app, #app > div, #app > div > div { height: 100% !important; min-height: 100vh !important; width: 100% !important; }',
+    'html { height: 100% !important; }',
+    'body { height: 100vh !important; min-height: 100vh !important; margin: 0 !important; }',
+    'body > div, body > div > div { height: 100% !important; min-height: 100% !important; }',
   ].join('\n');
   var st = document.getElementById('kruzly-fix') || document.createElement('style');
   st.id = 'kruzly-fix';
@@ -21,10 +23,11 @@
   function rect(e) {
     if (!e) return 'null';
     var r = e.getBoundingClientRect();
-    return e.tagName + (e.id ? '#' + e.id : '') + ' ' + Math.round(r.width) + 'x' + Math.round(r.height);
+    return e.tagName + ' ' + Math.round(r.width) + 'x' + Math.round(r.height);
   }
   setTimeout(function () {
-    console.log('[kruzly] whatsapp.js ' + V + ' body=' + rect(document.body) + ' app=' + rect(document.getElementById('app')) +
-      ' hijos=' + (document.getElementById('app') ? document.getElementById('app').children.length : '-'));
+    var first = document.body && document.body.querySelector(':scope > div');
+    console.log('[kruzly] whatsapp.js ' + V + ' body=' + rect(document.body) + ' div1=' + rect(first) +
+      ' div2=' + rect(first && first.querySelector(':scope > div')));
   }, 1500);
 })();
