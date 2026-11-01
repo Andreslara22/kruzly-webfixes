@@ -9,6 +9,7 @@
 // "Link with phone number instead" para ir directo al código.
 // v6: el toque de v5 no se disparaba; ahora busca el texto visible aunque venga
 // partido en varios nodos y toca el elemento clicable con eventos de puntero.
+// v18: chat sin desplazamiento ni teclado que tape, sin línea vertical, botón ‹ separado del avatar.
 // v17: medidas en px y capa 200 (el panel vacío con z-index 100 tapaba la lista).
 // v16: vista de celular rehecha sobre la estructura real (lista o chat a pantalla completa).
 // v15: v14 dejó todo en blanco: se quita la vista de una columna y se registra la estructura.
@@ -19,7 +20,7 @@
 // v10: vinculación con zoom para que se lea bien en el teléfono.
 // v7: v6 tocó un contenedor de toda la página; ahora toca el elemento más pequeño.
 (function () {
-  var V = 'v17';
+  var V = 'v18';
   if (window.__kruzlyFixVersion === V) return;
   window.__kruzlyFixVersion = V;
 
@@ -280,7 +281,7 @@
     b = document.createElement('div');
     b.id = 'kruzly-back';
     b.textContent = '‹';
-    b.style.cssText = 'position:fixed!important;left:4px!important;top:12px!important;z-index:2147483646!important;width:36px!important;height:36px!important;border-radius:50%!important;background:#25D366!important;color:#fff!important;font:bold 28px/34px sans-serif!important;text-align:center!important;box-shadow:0 2px 8px rgba(0,0,0,.3)!important;cursor:pointer!important';
+    b.style.cssText = 'position:fixed!important;left:4px!important;top:12px!important;z-index:2147483646!important;width:34px!important;height:34px!important;border-radius:50%!important;background:#25D366!important;color:#fff!important;font:bold 28px/34px sans-serif!important;text-align:center!important;box-shadow:0 2px 8px rgba(0,0,0,.3)!important;cursor:pointer!important';
     b.addEventListener('click', function () {
       var t = chatTitle();
       var ev = { key: 'Escape', code: 'Escape', keyCode: 27, which: 27, bubbles: true, cancelable: true };
@@ -334,8 +335,10 @@
   // z-index 200: el panel vacío de la derecha tiene z-index 100 y tapaba la lista; los cajones de WhatsApp (300) quedan encima.
   function fullBox() {
     var Z = zoomNow();
-    return { position: 'fixed', left: '0', top: '0', width: Math.floor(window.innerWidth / Z) + 'px', height: Math.floor(window.innerHeight / Z) + 'px',
-      'max-width': 'none', 'min-width': '0', margin: '0', 'z-index': '200', background: '#fff' };
+    // v18: altura de lo visible (sin teclado); el teclado no empuja la página.
+    var vh = Math.min(window.innerHeight, (window.visualViewport && window.visualViewport.height) || window.innerHeight);
+    return { position: 'fixed', left: '0', top: '0', width: Math.floor(window.innerWidth / Z) + 'px', height: Math.floor(vh / Z) + 'px',
+      'max-width': 'none', 'min-width': '0', margin: '0', 'z-index': '200', background: '#fff', border: '0', 'box-shadow': 'none', overflow: 'hidden' };
   }
   var lastMode = '', lastEls = {};
   function mobileChats() {
@@ -368,8 +371,12 @@
     } else {
       kzSet(listCol, { display: 'none' });
       kzSet(chatCol, fullBox());
+      // v18: la página no se desplaza (el teclado la subía y ocultaba el campo de texto).
+      kzSet(document.documentElement, { overflow: 'hidden' });
+      window.scrollTo(0, 0);
       var hd = document.querySelector('#main header');
-      kzSet(hd, { 'padding-left': '44px' });
+      kzSet(hd, { 'padding-left': '52px' });
+      if (hd && hd.firstElementChild) kzSet(hd.firstElementChild, { 'margin-left': '44px' });
       backButton(true);
     }
     // Red de seguridad: si lo que debería verse no mide nada, se deshace todo y no se vuelve a intentar.
