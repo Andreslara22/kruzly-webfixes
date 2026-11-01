@@ -9,6 +9,7 @@
 // "Link with phone number instead" para ir directo al código.
 // v6: el toque de v5 no se disparaba; ahora busca el texto visible aunque venga
 // partido en varios nodos y toca el elemento clicable con eventos de puntero.
+// v16: vista de celular rehecha sobre la estructura real (lista o chat a pantalla completa).
 // v15: v14 dejó todo en blanco: se quita la vista de una columna y se registra la estructura.
 // v14: vista de celular con sesión: una columna, zoom según el teléfono, botón ‹.
 // v13: no tocar animaciones ni opacidad (trababan el código), sin etiqueta roja.
@@ -17,7 +18,7 @@
 // v10: vinculación con zoom para que se lea bien en el teléfono.
 // v7: v6 tocó un contenedor de toda la página; ahora toca el elemento más pequeño.
 (function () {
-  var V = 'v15';
+  var V = 'v16';
   if (window.__kruzlyFixVersion === V) return;
   window.__kruzlyFixVersion = V;
 
@@ -200,7 +201,7 @@
     var logged = document.querySelector('#pane-side, [data-testid="chat-list"], [aria-label="Chat list"], [aria-label="Lista de chats"]');
     var txt = document.body ? (document.body.innerText || '').slice(0, 1500) : '';
     var Z = phoneZoom();
-    var want = logged ? 1 : (LOGIN_RX.test(txt) ? Math.min(LOGIN_ZOOM, Z) : 1); // v15: con sesión, sin zoom (v14 dejó la pantalla en blanco)
+    var want = logged ? Z : (LOGIN_RX.test(txt) ? Math.min(LOGIN_ZOOM, Z) : 1);
     if (zoomNow() !== want) {
       if (want === 1) document.documentElement.style.removeProperty('zoom');
       else document.documentElement.style.setProperty('zoom', String(want));
@@ -278,7 +279,7 @@
     b = document.createElement('div');
     b.id = 'kruzly-back';
     b.textContent = '‹';
-    b.style.cssText = 'position:fixed!important;left:' + Math.round(6) + 'px!important;top:' + Math.round(10) + 'px!important;z-index:2147483646!important;width:' + Math.round(40) + 'px!important;height:' + Math.round(40) + 'px!important;border-radius:50%!important;background:#25D366!important;color:#fff!important;font:bold 30px/38px sans-serif!important;text-align:center!important;box-shadow:0 2px 8px rgba(0,0,0,.3)!important;cursor:pointer!important';
+    b.style.cssText = 'position:fixed!important;left:4px!important;top:12px!important;z-index:2147483646!important;width:36px!important;height:36px!important;border-radius:50%!important;background:#25D366!important;color:#fff!important;font:bold 28px/34px sans-serif!important;text-align:center!important;box-shadow:0 2px 8px rgba(0,0,0,.3)!important;cursor:pointer!important';
     b.addEventListener('click', function () {
       var t = chatTitle();
       var ev = { key: 'Escape', code: 'Escape', keyCode: 27, which: 27, bubbles: true, cancelable: true };
@@ -313,40 +314,64 @@
       e = e.parentElement;
     }
   }
+  // v16: vista de celular sobre la estructura real de WhatsApp Web (diagnóstico de Fede):
+  //   DIV.two > [ HEADER (barra de iconos, 64 px) | paneles absolutos vacíos | panel de la lista (contiene #side) | panel del chat (contiene #main) ]
+  // Solo se tocan 3 piezas: la barra HEADER, el panel de la lista y el panel del chat.
+  // Cada una se pone a pantalla completa (position:fixed) o se oculta; nada más se modifica.
+  var chatsDisabled = false, touched = [];
+  function kzSet(e, props) {
+    if (!e) return;
+    for (var k in props) e.style.setProperty(k, props[k], 'important');
+    if (touched.indexOf(e) < 0) touched.push(e);
+    e.__kz = (e.__kz || []).concat(Object.keys(props));
+  }
+  function kzClearAll() {
+    touched.forEach(function (e) { (e.__kz || []).forEach(function (k) { e.style.removeProperty(k); }); e.__kz = []; });
+    touched = [];
+  }
+  var FULL = { position: 'fixed', left: '0', top: '0', width: '100%', height: '100%', 'max-width': 'none', 'min-width': '0', margin: '0', 'z-index': '50', background: '#fff' };
+  var lastMode = '', lastEls = {};
   function mobileChats() {
     try { logStructure(); } catch (err) { console.log('[kruzly] estructura: ' + err); }
-    return;
-    var side = document.getElementById('side') || (document.getElementById('pane-side') || {}).parentElement;
-    if (!side) { backButton(false); return; }
-    var narrow = (window.innerWidth / zoomNow()) < 700;
-    // Buscar la fila de columnas: el ancestro de #side que tiene hermanos anchos.
-    var col = side, others = [], guard = 0;
-    while (col.parentElement && guard++ < 12) {
-      var sib = Array.prototype.filter.call(col.parentElement.children, function (c) { return c !== col && (c.offsetWidth > 150 || c.hasAttribute('data-kz-hidden')); });
-      if (sib.length) { others = sib; break; }
-      col = col.parentElement;
-    }
-    if (!others.length) return;
+    if (chatsDisabled) return;
+    var side = document.getElementById('side');
+    var two = side && side.closest('.two');
+    if (!two) { backButton(false); return; }
+    var Z = zoomNow();
+    var narrow = Z > 1 && (window.innerWidth / Z) < 700;
+    var kids = Array.prototype.slice.call(two.children);
+    var listCol = kids.filter(function (c) { return c.contains(side); })[0];
     var main = document.querySelector('#main');
+    var chatCol = main ? kids.filter(function (c) { return c.contains(main); })[0] : null;
+    var rail = kids.filter(function (c) { return c.tagName === 'HEADER'; })[0];
     var t = chatTitle();
     if (forcedListFor && t !== forcedListFor) forcedListFor = null;
-    var chatOpen = !!main && !forcedListFor;
-    if (!narrow) {
-      show(col, true); others.forEach(function (o) { show(o, true); });
+    var chatOpen = !!chatCol && !forcedListFor && chatCol !== listCol;
+    var mode = !narrow ? 'ancho' : (chatOpen ? 'chat' : 'lista');
+    var sig = mode + '|' + (listCol ? 'L' : '-') + (chatCol ? 'C' : '-');
+    if (sig === lastMode && lastEls.l === listCol && lastEls.c === chatCol && lastEls.z === Z) return;
+    kzClearAll();
+    lastMode = sig; lastEls = { l: listCol, c: chatCol, z: Z };
+    if (mode === 'ancho') { backButton(false); return; }
+    if (!listCol) return;
+    kzSet(rail, { display: 'none' });
+    if (mode === 'lista') {
+      kzSet(listCol, FULL);
       backButton(false);
-      return;
+    } else {
+      kzSet(listCol, { display: 'none' });
+      kzSet(chatCol, FULL);
+      var hd = document.querySelector('#main header');
+      kzSet(hd, { 'padding-left': '44px' });
+      backButton(true);
     }
-    full(col);
-    show(col, !chatOpen);
-    others.forEach(function (o) {
-      var hasMain = main && o.contains(main);
-      if (hasMain || !main) full(o);
-      if (hasMain) show(o, chatOpen);
-      else if (!chatOpen) show(o, false);
-    });
-    backButton(chatOpen);
-    var lg = 'narrow chatOpen=' + chatOpen + ' cols=' + (others.length + 1);
-    if (lg !== lastLayoutLog) { lastLayoutLog = lg; console.log('[kruzly] vista móvil ' + lg + ' zoom=' + zoomNow()); }
+    // Red de seguridad: si lo que debería verse no mide nada, se deshace todo y no se vuelve a intentar.
+    var vis = mode === 'lista' ? listCol : chatCol, r = vis.getBoundingClientRect();
+    if (r.width < 50 || r.height < 50) {
+      console.log('[kruzly] vista móvil: sin tamaño visible (' + Math.round(r.width) + 'x' + Math.round(r.height) + '), se desactiva');
+      kzClearAll(); backButton(false); chatsDisabled = true; return;
+    }
+    console.log('[kruzly] vista móvil ' + mode + ' zoom=' + Z + ' visible=' + Math.round(r.width) + 'x' + Math.round(r.height));
   }
   window.addEventListener('resize', function () { try { force(); mobileLogin(); } catch (err) {} });
   var _ml = mobileLogin;
