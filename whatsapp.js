@@ -7,8 +7,10 @@
 // v5: v4 estiraba de más (forzaba cajas de 43 px). Ahora solo se fuerzan
 // las que miden 0, y como el QR no sirve en el mismo teléfono, se toca solo
 // "Link with phone number instead" para ir directo al código.
+// v6: el toque de v5 no se disparaba; ahora busca el texto visible aunque venga
+// partido en varios nodos y toca el elemento clicable con eventos de puntero.
 (function () {
-  var V = 'v5';
+  var V = 'v6';
   if (window.__kruzlyFixVersion === V) return;
   window.__kruzlyFixVersion = V;
 
@@ -45,6 +47,7 @@
     return targets;
   }
 
+  console.log('[kruzly] whatsapp.js ' + V + ' cargado');
   var targets = force();
   if (window.MutationObserver && document.body) {
     new MutationObserver(function () { force(); }).observe(document.body, { attributes: true, attributeFilter: ['style', 'class'] });
@@ -58,22 +61,39 @@
     return e.tagName + ' ' + Math.round(r.width) + 'x' + Math.round(r.height) + ' style="' + (e.getAttribute('style') || '').slice(0, 120) + '"';
   }
   // Ir directo a "vincular con número": el QR no se puede escanear desde el mismo teléfono.
-  var clicked = false;
+  // v6: se busca el TEXTO (puede venir partido en varios nodos), se ignora la copia
+  // oculta para lectores de pantalla (x=-999) y se toca el elemento clicable.
+  var RX = /Link with phone number|Log in with phone number|Vincular con (el )?n[uú]mero|Iniciar sesi[oó]n con (el )?n[uú]mero/i;
+  function visible(e) { var r = e.getBoundingClientRect(); return r.width > 2 && r.height > 2 && r.right > 0 && r.bottom > 0; }
+  function tap(e) {
+    var r = e.getBoundingClientRect(), x = r.left + r.width / 2, y = r.top + r.height / 2;
+    var o = { bubbles: true, cancelable: true, view: window, clientX: x, clientY: y, button: 0 };
+    try { e.dispatchEvent(new PointerEvent('pointerdown', o)); } catch (err) {}
+    e.dispatchEvent(new MouseEvent('mousedown', o));
+    try { e.dispatchEvent(new PointerEvent('pointerup', o)); } catch (err) {}
+    e.dispatchEvent(new MouseEvent('mouseup', o));
+    e.click();
+  }
+  var clicked = false, tries = 0;
   var clickTimer = setInterval(function () {
-    if (clicked) { clearInterval(clickTimer); return; }
-    var nodes = document.querySelectorAll('span, div, a, button');
-    for (var i = 0; i < nodes.length; i++) {
-      var n = nodes[i];
-      if (n.children.length === 0 && /^(Link with phone number( instead)?\.?|Vincular con (el )?n[uú]mero de tel[eé]fono( en su lugar)?\.?)$/i.test((n.textContent || '').trim())) {
-        var target = n.closest('[role="button"], button, a') || n;
-        target.click();
-        clicked = true;
-        console.log('[kruzly] toque automático en "' + n.textContent.trim() + '"');
-        break;
-      }
+    if (clicked || ++tries > 30) { clearInterval(clickTimer); if (!clicked) console.log('[kruzly] no encontré el botón de número visible'); return; }
+    var walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT), t;
+    while ((t = walker.nextNode())) {
+      var el = t.parentElement;
+      if (!el) continue;
+      // Sube hasta que el texto completo coincida (por si viene partido)
+      var cand = el, k = 0;
+      while (cand && cand !== document.body && !RX.test(cand.textContent || '') && k < 4) { cand = cand.parentElement; k++; }
+      if (!cand || cand === document.body || !RX.test(cand.textContent || '') || (cand.textContent || '').length > 80) continue;
+      if (!visible(cand)) continue;
+      var target = cand.closest('[role="button"], button, a, [tabindex]') || cand;
+      var r = target.getBoundingClientRect();
+      tap(target);
+      clicked = true;
+      console.log('[kruzly] toque automático en ' + target.tagName + ' "' + (target.textContent || '').trim().slice(0, 60) + '" en ' + Math.round(r.left) + ',' + Math.round(r.top));
+      break;
     }
   }, 800);
-  setTimeout(function () { clearInterval(clickTimer); }, 20000);
 
   setTimeout(function () {
     var t = force();
