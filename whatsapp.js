@@ -9,11 +9,12 @@
 // "Link with phone number instead" para ir directo al código.
 // v6: el toque de v5 no se disparaba; ahora busca el texto visible aunque venga
 // partido en varios nodos y toca el elemento clicable con eventos de puntero.
+// v12: tarjeta de vinculación arriba, sin espacio vacío.
 // v11: botón grande para copiar el código de 8 letras.
 // v10: vinculación con zoom para que se lea bien en el teléfono.
 // v7: v6 tocó un contenedor de toda la página; ahora toca el elemento más pequeño.
 (function () {
-  var V = 'v11';
+  var V = 'v12';
   if (window.__kruzlyFixVersion === V) return;
   window.__kruzlyFixVersion = V;
 
@@ -135,7 +136,7 @@
     if (document.getElementById('kruzly-badge')) return;
     var b = document.createElement('div');
     b.id = 'kruzly-badge';
-    b.textContent = 'Kruzly v11';
+    b.textContent = 'Kruzly v12';
     b.style.cssText = 'position:fixed!important;left:8px!important;top:8px!important;z-index:2147483647!important;background:#e53935!important;color:#fff!important;font:bold 28px sans-serif!important;padding:6px 12px!important;pointer-events:none!important;opacity:1!important;visibility:visible!important';
     document.documentElement.appendChild(b);
     setTimeout(function () { b.style.setProperty('display', 'none', 'important'); }, 4000);
@@ -219,6 +220,37 @@
       }
     }
   }
+  // v12: la tarjeta quedaba centrada a media pantalla (contenedores altos con
+  // centrado vertical). Se sube: arriba con un margen pequeño.
+  var TITLE_RX = /^(Enter phone number|Scan to log in|Enter code on (your )?phone|Steps to log in|Ingresa (tu|el) n[uú]mero.*|Introduce el c[oó]digo.*|Escanea.*)$/i;
+  function liftCard() {
+    if (zoomNow() === 1) return;
+    var title = null, all = document.body.querySelectorAll('h1, h2, div, span');
+    for (var i = 0; i < all.length; i++) {
+      var e = all[i];
+      if (e.children.length === 0 && TITLE_RX.test((e.textContent || '').trim()) && e.getBoundingClientRect().width > 2) { title = e; break; }
+    }
+    if (!title) return;
+    var avail = window.innerWidth / zoomNow(), card = null, e2 = title, n = 0;
+    while (e2 && e2 !== document.body && n++ < 25) {
+      if (!card && e2.offsetWidth >= avail - 60) { card = e2; }
+      else if (card) {
+        e2.style.setProperty('justify-content', 'flex-start', 'important');
+        e2.style.setProperty('align-content', 'flex-start', 'important');
+        e2.style.setProperty('margin-top', '0', 'important');
+        e2.style.setProperty('padding-top', '0', 'important');
+        if (getComputedStyle(e2).position === 'absolute') e2.style.setProperty('top', '0', 'important');
+      }
+      e2 = e2.parentElement;
+    }
+    if (card) {
+      card.style.setProperty('margin-top', '12px', 'important');
+      card.style.setProperty('transform', 'none', 'important');
+      if (getComputedStyle(card).position === 'absolute') card.style.setProperty('top', '0', 'important');
+    }
+  }
+  var _ml = mobileLogin;
+  mobileLogin = function () { _ml(); liftCard(); };
   try { mobileLogin(); } catch (err) { console.log('[kruzly] zoom: ' + err); }
   setInterval(function () { try { mobileLogin(); } catch (err) {} }, 1000);
 
