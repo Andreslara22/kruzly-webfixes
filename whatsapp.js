@@ -215,7 +215,8 @@
     var logged = document.querySelector('#pane-side, [data-testid="chat-list"], [aria-label="Chat list"], [aria-label="Lista de chats"]');
     var txt = document.body ? (document.body.innerText || '').slice(0, 1500) : '';
     var Z = phoneZoom();
-    var want = logged ? Z : (LOGIN_RX.test(txt) ? Math.min(LOGIN_ZOOM, Z) : 1);
+    // v23b: con la vista de celular apagada, sin zoom al tener sesión (diseño original que sí funcionaba).
+    var want = logged ? (chatsDisabled ? 1 : Z) : (LOGIN_RX.test(txt) ? Math.min(LOGIN_ZOOM, Z) : 1);
     if (zoomNow() !== want) {
       if (want === 1) document.documentElement.style.removeProperty('zoom');
       else document.documentElement.style.setProperty('zoom', String(want));
