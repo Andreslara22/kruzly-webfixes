@@ -9,6 +9,7 @@
 // "Link with phone number instead" para ir directo al código.
 // v6: el toque de v5 no se disparaba; ahora busca el texto visible aunque venga
 // partido en varios nodos y toca el elemento clicable con eventos de puntero.
+// v20: en el chat se ocultan capas absolutas vacías (posible origen de la línea vertical).
 // v19: sin bucle de escritura de estilos (parpadeo al abrir chat).
 // v18: chat sin desplazamiento ni teclado que tape, sin línea vertical, botón ‹ separado del avatar.
 // v17: medidas en px y capa 200 (el panel vacío con z-index 100 tapaba la lista).
@@ -21,7 +22,7 @@
 // v10: vinculación con zoom para que se lea bien en el teléfono.
 // v7: v6 tocó un contenedor de toda la página; ahora toca el elemento más pequeño.
 (function () {
-  var V = 'v19';
+  var V = 'v20';
   if (window.__kruzlyFixVersion === V) return;
   window.__kruzlyFixVersion = V;
 
@@ -381,6 +382,14 @@
       kzSet(chatCol, fullBox());
       // v18: la página no se desplaza (el teclado la subía y ocultaba el campo de texto).
       kzSet(document.documentElement, { overflow: 'hidden' });
+      // v20: ocultar capas absolutas vacías del panel (una de ellas dibuja la línea vertical).
+      kids.forEach(function (c) {
+        if (c === listCol || c === chatCol || c === rail) return;
+        if (c.contains(side) || (main && c.contains(main))) return;
+        if (getComputedStyle(c).position !== 'absolute') return;
+        if ((c.textContent || '').trim().length > 0) return;
+        kzSet(c, { display: 'none' });
+      });
       window.scrollTo(0, 0);
       var hd = document.querySelector('#main header');
       kzSet(hd, { 'padding-left': '52px' });
