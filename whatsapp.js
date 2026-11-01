@@ -9,6 +9,7 @@
 // "Link with phone number instead" para ir directo al código.
 // v6: el toque de v5 no se disparaba; ahora busca el texto visible aunque venga
 // partido en varios nodos y toca el elemento clicable con eventos de puntero.
+// v24: al cambiar el tamaño de la web (teclado) se reajustan las alturas forzadas.
 // v23: se desactiva la vista de celular del chat (temblor y caja de texto oculta). Se mantienen zoom, código y vinculación.
 // v22: sin temblor: al cambiar el tamaño solo se reajustan los paneles, no se reescribe ni desplaza la página.
 // v21: el chat deja espacio abajo para los botones de Android (la caja de texto quedaba debajo).
@@ -25,7 +26,7 @@
 // v10: vinculación con zoom para que se lea bien en el teléfono.
 // v7: v6 tocó un contenedor de toda la página; ahora toca el elemento más pequeño.
 (function () {
-  var V = 'v23';
+  var V = 'v24';
   if (window.__kruzlyFixVersion === V) return;
   window.__kruzlyFixVersion = V;
 
@@ -418,7 +419,9 @@
     if (lastMode.indexOf('chat') >= 0 && lastEls.c) kzSet(lastEls.c, fullBox());
     if (lastMode.indexOf('lista') >= 0 && lastEls.l) kzSet(lastEls.l, fullBox());
   }
-  window.addEventListener('resize', function () { try { resizeBoxes(); } catch (err) {} });
+  // v24: el build 17 achica la web cuando sale el teclado; las alturas forzadas se ajustan al nuevo tamaño
+  // (solo escribe si cambia, sin bucles).
+  window.addEventListener('resize', function () { try { force(); resizeBoxes(); } catch (err) {} });
   var _ml = mobileLogin;
   mobileLogin = function () { _ml(); liftCard(); mobileChats(); };
   try { mobileLogin(); } catch (err) { console.log('[kruzly] zoom: ' + err); }
