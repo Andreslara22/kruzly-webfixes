@@ -9,6 +9,7 @@
 // "Link with phone number instead" para ir directo al código.
 // v6: el toque de v5 no se disparaba; ahora busca el texto visible aunque venga
 // partido en varios nodos y toca el elemento clicable con eventos de puntero.
+// v21: el chat deja espacio abajo para los botones de Android (la caja de texto quedaba debajo).
 // v20: en el chat se ocultan capas absolutas vacías (posible origen de la línea vertical).
 // v19: sin bucle de escritura de estilos (parpadeo al abrir chat).
 // v18: chat sin desplazamiento ni teclado que tape, sin línea vertical, botón ‹ separado del avatar.
@@ -22,7 +23,7 @@
 // v10: vinculación con zoom para que se lea bien en el teléfono.
 // v7: v6 tocó un contenedor de toda la página; ahora toca el elemento más pequeño.
 (function () {
-  var V = 'v20';
+  var V = 'v21';
   if (window.__kruzlyFixVersion === V) return;
   window.__kruzlyFixVersion = V;
 
@@ -346,6 +347,8 @@
     var Z = zoomNow();
     // v18: altura de lo visible (sin teclado); el teclado no empuja la página.
     var vh = Math.min(window.innerHeight, (window.visualViewport && window.visualViewport.height) || window.innerHeight);
+    // v21: dejar espacio para los botones de navegación de Android (~56 dp, en px de esta página).
+    vh -= Math.round(56 * window.innerWidth / 412);
     return { position: 'fixed', left: '0', top: '0', width: Math.floor(window.innerWidth / Z) + 'px', height: Math.floor(vh / Z) + 'px',
       'max-width': 'none', 'min-width': '0', margin: '0', 'z-index': '200', background: '#fff', border: '0', 'box-shadow': 'none', overflow: 'hidden' };
   }
