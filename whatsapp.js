@@ -11,7 +11,7 @@
 // partido en varios nodos y toca el elemento clicable con eventos de puntero.
 // v7: v6 tocó un contenedor de toda la página; ahora toca el elemento más pequeño.
 (function () {
-  var V = 'v8';
+  var V = 'v9';
   if (window.__kruzlyFixVersion === V) return;
   window.__kruzlyFixVersion = V;
 
@@ -131,7 +131,7 @@
     if (document.getElementById('kruzly-badge')) return;
     var b = document.createElement('div');
     b.id = 'kruzly-badge';
-    b.textContent = 'Kruzly v8';
+    b.textContent = 'Kruzly v9';
     b.style.cssText = 'position:fixed!important;left:8px!important;top:8px!important;z-index:2147483647!important;background:#e53935!important;color:#fff!important;font:bold 28px sans-serif!important;padding:6px 12px!important;pointer-events:none!important;opacity:1!important;visibility:visible!important';
     document.documentElement.appendChild(b);
   }
@@ -154,6 +154,15 @@
       if (cs.contentVisibility && cs.contentVisibility !== 'visible') { e.style.setProperty('content-visibility', 'visible', 'important'); why.push('content-visibility ' + cs.contentVisibility); }
       if (/matrix\(0, 0, 0, 0|scale\(0/.test(cs.transform)) { e.style.setProperty('transform', 'none', 'important'); why.push('transform ' + cs.transform); }
       if (cs.clipPath && /inset\(50%|circle\(0/.test(cs.clipPath)) { e.style.setProperty('clip-path', 'none', 'important'); why.push('clip-path'); }
+      // v9: el login vive dentro de una caja de 28 px con overflow:auto que recorta todo.
+      if (/auto|hidden|scroll|clip/.test(cs.overflowY + cs.overflow) && e.clientWidth > 500 && e.clientHeight < 200 && e.scrollHeight > e.clientHeight + 50) {
+        var hh = Math.max(e.scrollHeight, h()) + 'px';
+        e.style.setProperty('height', hh, 'important');
+        e.style.setProperty('min-height', hh, 'important');
+        e.style.setProperty('max-height', 'none', 'important');
+        e.style.setProperty('overflow', 'visible', 'important');
+        why.push('caja recortada ' + e.clientHeight + 'px de ' + e.scrollHeight + 'px');
+      }
       if (why.length) {
         var key = e.tagName + '.' + String(e.className || '').slice(0, 40);
         if (!revealedLog[key]) {
