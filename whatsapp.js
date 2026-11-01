@@ -9,6 +9,7 @@
 // "Link with phone number instead" para ir directo al código.
 // v6: el toque de v5 no se disparaba; ahora busca el texto visible aunque venga
 // partido en varios nodos y toca el elemento clicable con eventos de puntero.
+// v19: sin bucle de escritura de estilos (parpadeo al abrir chat).
 // v18: chat sin desplazamiento ni teclado que tape, sin línea vertical, botón ‹ separado del avatar.
 // v17: medidas en px y capa 200 (el panel vacío con z-index 100 tapaba la lista).
 // v16: vista de celular rehecha sobre la estructura real (lista o chat a pantalla completa).
@@ -20,7 +21,7 @@
 // v10: vinculación con zoom para que se lea bien en el teléfono.
 // v7: v6 tocó un contenedor de toda la página; ahora toca el elemento más pequeño.
 (function () {
-  var V = 'v18';
+  var V = 'v19';
   if (window.__kruzlyFixVersion === V) return;
   window.__kruzlyFixVersion = V;
 
@@ -28,6 +29,10 @@
   function h() { return rawH() / zoomNow(); }
   function rawH() { return Math.max(window.innerHeight || 0, (window.visualViewport && window.visualViewport.height) || 0, document.documentElement.clientHeight || 0) || 2000; }
 
+  function setIf(e, prop, val) {
+    if (e.style.getPropertyValue(prop) === val && e.style.getPropertyPriority(prop) === 'important') return;
+    e.style.setProperty(prop, val, 'important');
+  }
   function force() {
     var px = h() + 'px';
     var targets = [document.documentElement, document.body];
@@ -49,12 +54,14 @@
         e = e.parentElement; n++;
       }
     }
+    // v19: escribir solo si cambia. Antes cada escritura disparaba el MutationObserver,
+    // que volvía a escribir: bucle que hacía parpadear la pantalla al abrir un chat.
     targets.forEach(function (e) {
       if (!e) return;
-      e.style.setProperty('height', px, 'important');
-      e.style.setProperty('min-height', px, 'important');
-      e.style.setProperty('max-height', 'none', 'important');
-      e.style.setProperty('overflow', 'visible', 'important');
+      setIf(e, 'height', px);
+      setIf(e, 'min-height', px);
+      setIf(e, 'max-height', 'none');
+      setIf(e, 'overflow', 'visible');
     });
     return targets;
   }
@@ -62,7 +69,8 @@
   console.log('[kruzly] whatsapp.js ' + V + ' cargado');
   var targets = force();
   if (window.MutationObserver && document.body) {
-    new MutationObserver(function () { force(); }).observe(document.body, { attributes: true, attributeFilter: ['style', 'class'] });
+    // v19: el observador ya no vigila el estilo del body (ahí se producía el bucle).
+    new MutationObserver(function () { force(); }).observe(document.body, { attributes: true, attributeFilter: ['class'] });
   }
   var ticks = 0;
   var timer = setInterval(function () { force(); if (++ticks > 20) clearInterval(timer); }, 500);
