@@ -9,13 +9,14 @@
 // "Link with phone number instead" para ir directo al código.
 // v6: el toque de v5 no se disparaba; ahora busca el texto visible aunque venga
 // partido en varios nodos y toca el elemento clicable con eventos de puntero.
+// v14: vista de celular con sesión: una columna, zoom según el teléfono, botón ‹.
 // v13: no tocar animaciones ni opacidad (trababan el código), sin etiqueta roja.
 // v12: tarjeta de vinculación arriba, sin espacio vacío.
 // v11: botón grande para copiar el código de 8 letras.
 // v10: vinculación con zoom para que se lea bien en el teléfono.
 // v7: v6 tocó un contenedor de toda la página; ahora toca el elemento más pequeño.
 (function () {
-  var V = 'v13';
+  var V = 'v14';
   if (window.__kruzlyFixVersion === V) return;
   window.__kruzlyFixVersion = V;
 
@@ -197,14 +198,15 @@
   function mobileLogin() {
     var logged = document.querySelector('#pane-side, [data-testid="chat-list"], [aria-label="Chat list"], [aria-label="Lista de chats"]');
     var txt = document.body ? (document.body.innerText || '').slice(0, 1500) : '';
-    var want = (!logged && LOGIN_RX.test(txt)) ? LOGIN_ZOOM : 1;
+    var Z = phoneZoom();
+    var want = logged ? Z : (LOGIN_RX.test(txt) ? Math.min(LOGIN_ZOOM, Z) : 1);
     if (zoomNow() !== want) {
       if (want === 1) document.documentElement.style.removeProperty('zoom');
       else document.documentElement.style.setProperty('zoom', String(want));
       force();
       console.log('[kruzly] zoom ' + want + (logged ? ' (sesión iniciada)' : ''));
     }
-    if (want !== 1) {
+    if (want !== 1 && !logged) {
       var avail = window.innerWidth / want;
       var all = (document.querySelector('.app-wrapper-web') || document.body).querySelectorAll('div, form');
       for (var i = 0; i < all.length; i++) {
@@ -223,7 +225,7 @@
   // centrado vertical). Se sube: arriba con un margen pequeño.
   var TITLE_RX = /^(Enter phone number|Scan to log in|Enter code on (your )?phone|Steps to log in|Ingresa (tu|el) n[uú]mero.*|Introduce el c[oó]digo.*|Escanea.*)$/i;
   function liftCard() {
-    if (zoomNow() === 1) return;
+    if (zoomNow() === 1 || document.getElementById('pane-side')) return;
     var title = null, all = document.body.querySelectorAll('h1, h2, div, span');
     for (var i = 0; i < all.length; i++) {
       var e = all[i];
@@ -248,10 +250,83 @@
       if (getComputedStyle(card).position === 'absolute') card.style.setProperty('top', '0', 'important');
     }
   }
+  // v14: vista de celular con la sesión iniciada.
+  // - Zoom según el ancho real del teléfono (1024 / ancho de pantalla), sirve en cualquier modelo.
+  // - Si el ancho que queda es de teléfono (< 700 px): una sola columna. Lista de chats a todo
+  //   el ancho; al abrir un chat, solo el chat, con un botón ‹ para volver a la lista.
+  // - En pantallas anchas (Fold abierto, tablet) se deja el diseño de dos columnas.
+  function phoneZoom() {
+    var sw = Math.min(screen.width || 412, screen.height || 9999);
+    if (window.innerWidth && screen.width && screen.width > screen.height) sw = screen.width; // horizontal
+    return Math.max(1, Math.min(3, 1024 / Math.max(320, sw)));
+  }
+  var forcedListFor = null;
+  function chatTitle() { var hd = document.querySelector('#main header'); return hd ? (hd.textContent || '').trim().slice(0, 80) : null; }
+  function show(e, on) { if (on) { e.style.removeProperty('display'); e.removeAttribute('data-kz-hidden'); } else { e.style.setProperty('display', 'none', 'important'); e.setAttribute('data-kz-hidden', '1'); } }
+  function full(e) {
+    e.style.setProperty('flex', '1 1 100%', 'important');
+    e.style.setProperty('max-width', 'none', 'important');
+    e.style.setProperty('min-width', '0', 'important');
+    e.style.setProperty('width', '100%', 'important');
+  }
+  function backButton(on) {
+    var b = document.getElementById('kruzly-back');
+    if (!on) { if (b) b.remove(); return; }
+    if (b) return;
+    var z = zoomNow();
+    b = document.createElement('div');
+    b.id = 'kruzly-back';
+    b.textContent = '‹';
+    b.style.cssText = 'position:fixed!important;left:' + Math.round(6) + 'px!important;top:' + Math.round(10) + 'px!important;z-index:2147483646!important;width:' + Math.round(40) + 'px!important;height:' + Math.round(40) + 'px!important;border-radius:50%!important;background:#25D366!important;color:#fff!important;font:bold 30px/38px sans-serif!important;text-align:center!important;box-shadow:0 2px 8px rgba(0,0,0,.3)!important;cursor:pointer!important';
+    b.addEventListener('click', function () {
+      var t = chatTitle();
+      var ev = { key: 'Escape', code: 'Escape', keyCode: 27, which: 27, bubbles: true, cancelable: true };
+      (document.activeElement || document.body).dispatchEvent(new KeyboardEvent('keydown', ev));
+      document.dispatchEvent(new KeyboardEvent('keydown', ev));
+      setTimeout(function () { if (document.querySelector('#main')) forcedListFor = t; mobileChats(); }, 400);
+    });
+    document.documentElement.appendChild(b);
+  }
+  var lastLayoutLog = '';
+  function mobileChats() {
+    var side = document.getElementById('side') || (document.getElementById('pane-side') || {}).parentElement;
+    if (!side) { backButton(false); return; }
+    var narrow = (window.innerWidth / zoomNow()) < 700;
+    // Buscar la fila de columnas: el ancestro de #side que tiene hermanos anchos.
+    var col = side, others = [], guard = 0;
+    while (col.parentElement && guard++ < 12) {
+      var sib = Array.prototype.filter.call(col.parentElement.children, function (c) { return c !== col && (c.offsetWidth > 150 || c.hasAttribute('data-kz-hidden')); });
+      if (sib.length) { others = sib; break; }
+      col = col.parentElement;
+    }
+    if (!others.length) return;
+    var main = document.querySelector('#main');
+    var t = chatTitle();
+    if (forcedListFor && t !== forcedListFor) forcedListFor = null;
+    var chatOpen = !!main && !forcedListFor;
+    if (!narrow) {
+      show(col, true); others.forEach(function (o) { show(o, true); });
+      backButton(false);
+      return;
+    }
+    full(col);
+    show(col, !chatOpen);
+    others.forEach(function (o) {
+      var hasMain = main && o.contains(main);
+      if (hasMain || !main) full(o);
+      if (hasMain) show(o, chatOpen);
+      else if (!chatOpen) show(o, false);
+    });
+    backButton(chatOpen);
+    var lg = 'narrow chatOpen=' + chatOpen + ' cols=' + (others.length + 1);
+    if (lg !== lastLayoutLog) { lastLayoutLog = lg; console.log('[kruzly] vista móvil ' + lg + ' zoom=' + zoomNow()); }
+  }
+  window.addEventListener('resize', function () { try { force(); mobileLogin(); } catch (err) {} });
   var _ml = mobileLogin;
-  mobileLogin = function () { _ml(); liftCard(); };
+  mobileLogin = function () { _ml(); liftCard(); mobileChats(); };
   try { mobileLogin(); } catch (err) { console.log('[kruzly] zoom: ' + err); }
   setInterval(function () { try { mobileLogin(); } catch (err) {} }, 1000);
+  setInterval(function () { try { mobileChats(); } catch (err) {} }, 300);
 
   // v11: en la pantalla del código de 8 letras, botón grande "Copiar código".
   // Abrir la app de WhatsApp desde aquí necesita un build (la app bloquea enlaces
