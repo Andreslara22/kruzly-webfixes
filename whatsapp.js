@@ -9,6 +9,7 @@
 // "Link with phone number instead" para ir directo al código.
 // v6: el toque de v5 no se disparaba; ahora busca el texto visible aunque venga
 // partido en varios nodos y toca el elemento clicable con eventos de puntero.
+// v22: sin temblor: al cambiar el tamaño solo se reajustan los paneles, no se reescribe ni desplaza la página.
 // v21: el chat deja espacio abajo para los botones de Android (la caja de texto quedaba debajo).
 // v20: en el chat se ocultan capas absolutas vacías (posible origen de la línea vertical).
 // v19: sin bucle de escritura de estilos (parpadeo al abrir chat).
@@ -23,7 +24,7 @@
 // v10: vinculación con zoom para que se lea bien en el teléfono.
 // v7: v6 tocó un contenedor de toda la página; ahora toca el elemento más pequeño.
 (function () {
-  var V = 'v21';
+  var V = 'v22';
   if (window.__kruzlyFixVersion === V) return;
   window.__kruzlyFixVersion = V;
 
@@ -371,9 +372,9 @@
     var chatOpen = !!chatCol && !forcedListFor && chatCol !== listCol;
     var mode = !narrow ? 'ancho' : (chatOpen ? 'chat' : 'lista');
     var sig = mode + '|' + (listCol ? 'L' : '-') + (chatCol ? 'C' : '-');
-    if (sig === lastMode && lastEls.l === listCol && lastEls.c === chatCol && lastEls.z === Z && lastEls.w === window.innerWidth && lastEls.hh === window.innerHeight) return;
+    if (sig === lastMode && lastEls.l === listCol && lastEls.c === chatCol && lastEls.z === Z) return;
     kzClearAll();
-    lastMode = sig; lastEls = { l: listCol, c: chatCol, z: Z, w: window.innerWidth, hh: window.innerHeight };
+    lastMode = sig; lastEls = { l: listCol, c: chatCol, z: Z };
     if (mode === 'ancho') { backButton(false); return; }
     if (!listCol) return;
     kzSet(rail, { display: 'none' });
@@ -407,7 +408,14 @@
     }
     console.log('[kruzly] vista móvil ' + mode + ' zoom=' + Z + ' visible=' + Math.round(r.width) + 'x' + Math.round(r.height));
   }
-  window.addEventListener('resize', function () { try { force(); mobileLogin(); } catch (err) {} });
+  // v22: al cambiar el tamaño (teclado, barra) solo se reajusta la altura de los paneles.
+  // Antes se volvía a escribir la página entera y a desplazarla: eso hacía temblar la pantalla.
+  function resizeBoxes() {
+    if (!lastEls.l && !lastEls.c) return;
+    if (lastMode.indexOf('chat') >= 0 && lastEls.c) kzSet(lastEls.c, fullBox());
+    if (lastMode.indexOf('lista') >= 0 && lastEls.l) kzSet(lastEls.l, fullBox());
+  }
+  window.addEventListener('resize', function () { try { resizeBoxes(); } catch (err) {} });
   var _ml = mobileLogin;
   mobileLogin = function () { _ml(); liftCard(); mobileChats(); };
   try { mobileLogin(); } catch (err) { console.log('[kruzly] zoom: ' + err); }
