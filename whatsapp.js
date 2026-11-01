@@ -9,10 +9,11 @@
 // "Link with phone number instead" para ir directo al código.
 // v6: el toque de v5 no se disparaba; ahora busca el texto visible aunque venga
 // partido en varios nodos y toca el elemento clicable con eventos de puntero.
+// v11: botón grande para copiar el código de 8 letras.
 // v10: vinculación con zoom para que se lea bien en el teléfono.
 // v7: v6 tocó un contenedor de toda la página; ahora toca el elemento más pequeño.
 (function () {
-  var V = 'v10';
+  var V = 'v11';
   if (window.__kruzlyFixVersion === V) return;
   window.__kruzlyFixVersion = V;
 
@@ -134,7 +135,7 @@
     if (document.getElementById('kruzly-badge')) return;
     var b = document.createElement('div');
     b.id = 'kruzly-badge';
-    b.textContent = 'Kruzly v10';
+    b.textContent = 'Kruzly v11';
     b.style.cssText = 'position:fixed!important;left:8px!important;top:8px!important;z-index:2147483647!important;background:#e53935!important;color:#fff!important;font:bold 28px sans-serif!important;padding:6px 12px!important;pointer-events:none!important;opacity:1!important;visibility:visible!important';
     document.documentElement.appendChild(b);
     setTimeout(function () { b.style.setProperty('display', 'none', 'important'); }, 4000);
@@ -220,6 +221,48 @@
   }
   try { mobileLogin(); } catch (err) { console.log('[kruzly] zoom: ' + err); }
   setInterval(function () { try { mobileLogin(); } catch (err) {} }, 1000);
+
+  // v11: en la pantalla del código de 8 letras, botón grande "Copiar código".
+  // Abrir la app de WhatsApp desde aquí necesita un build (la app bloquea enlaces
+  // que no sean web), así que por ahora se copia y se indica cómo cambiar de app.
+  function findCode() {
+    var el = document.querySelector('[data-link-code]');
+    if (el) { var c = (el.getAttribute('data-link-code') || '').replace(/[^A-Za-z0-9]/g, ''); if (c.length === 8) return c.toUpperCase(); }
+    var txt = document.body ? (document.body.innerText || '') : '';
+    if (!/Enter code|code on (your )?phone|Introduce (el|este) c[oó]digo|Ingresa (el|este) c[oó]digo/i.test(txt)) return null;
+    var m = txt.replace(/\n/g, '').match(/(?:^|[^A-Za-z0-9])([A-Z0-9]{4})\s*[-–]?\s*([A-Z0-9]{4})(?:[^A-Za-z0-9]|$)/);
+    return m ? m[1] + m[2] : null;
+  }
+  function copyText(t) {
+    var ok = false;
+    try { var ta = document.createElement('textarea'); ta.value = t; ta.style.cssText = 'position:fixed;top:0;left:0;opacity:0'; document.body.appendChild(ta); ta.select(); ok = document.execCommand('copy'); ta.remove(); } catch (err) {}
+    try { if (navigator.clipboard) navigator.clipboard.writeText(t); ok = true; } catch (err) {}
+    return ok;
+  }
+  function codeButton() {
+    var code = findCode(), box = document.getElementById('kruzly-code');
+    if (!code) { if (box) box.remove(); return; }
+    if (box && box.getAttribute('data-code') === code) return;
+    if (box) box.remove();
+    box = document.createElement('div');
+    box.id = 'kruzly-code';
+    box.setAttribute('data-code', code);
+    var z = zoomNow();
+    box.style.cssText = 'position:fixed!important;left:0!important;right:0!important;bottom:0!important;z-index:2147483646!important;background:#1F1A3D!important;color:#fff!important;padding:' + Math.round(24 / z) + 'px!important;font-family:sans-serif!important;text-align:center!important;box-shadow:0 -4px 16px rgba(0,0,0,.25)!important';
+    var pretty = code.slice(0, 4) + '-' + code.slice(4);
+    box.innerHTML = '<div style="font-size:' + Math.round(26 / z) + 'px;opacity:.85">Tu código</div>' +
+      '<div style="font-size:' + Math.round(64 / z) + 'px;font-weight:bold;letter-spacing:4px;margin:4px 0">' + pretty + '</div>' +
+      '<button id="kruzly-copy" style="font-size:' + Math.round(34 / z) + 'px;font-weight:bold;background:#25D366;color:#fff;border:0;border-radius:999px;padding:' + Math.round(18 / z) + 'px ' + Math.round(48 / z) + 'px;margin:8px 0">Copiar código</button>' +
+      '<div id="kruzly-copy-hint" style="font-size:' + Math.round(24 / z) + 'px;opacity:.85;margin-top:6px">Luego abre WhatsApp desde la notificación "Introduce el código" o desde apps recientes, y pégalo.</div>';
+    document.documentElement.appendChild(box);
+    document.getElementById('kruzly-copy').addEventListener('click', function () {
+      var ok = copyText(code);
+      this.textContent = ok ? '¡Copiado!' : 'Cópialo a mano: ' + pretty;
+      console.log('[kruzly] código copiado=' + ok);
+    });
+    console.log('[kruzly] código en pantalla ' + pretty);
+  }
+  setInterval(function () { try { codeButton(); } catch (err) {} }, 1000);
 
   setTimeout(function () {
     var t = force();
