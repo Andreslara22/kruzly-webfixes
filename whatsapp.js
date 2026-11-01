@@ -9,13 +9,16 @@
 // "Link with phone number instead" para ir directo al código.
 // v6: el toque de v5 no se disparaba; ahora busca el texto visible aunque venga
 // partido en varios nodos y toca el elemento clicable con eventos de puntero.
+// v10: vinculación con zoom para que se lea bien en el teléfono.
 // v7: v6 tocó un contenedor de toda la página; ahora toca el elemento más pequeño.
 (function () {
-  var V = 'v9';
+  var V = 'v10';
   if (window.__kruzlyFixVersion === V) return;
   window.__kruzlyFixVersion = V;
 
-  function h() { return Math.max(window.innerHeight || 0, (window.visualViewport && window.visualViewport.height) || 0, document.documentElement.clientHeight || 0) || 2000; }
+  function zoomNow() { return parseFloat(document.documentElement.style.zoom) || 1; }
+  function h() { return rawH() / zoomNow(); }
+  function rawH() { return Math.max(window.innerHeight || 0, (window.visualViewport && window.visualViewport.height) || 0, document.documentElement.clientHeight || 0) || 2000; }
 
   function force() {
     var px = h() + 'px';
@@ -131,9 +134,10 @@
     if (document.getElementById('kruzly-badge')) return;
     var b = document.createElement('div');
     b.id = 'kruzly-badge';
-    b.textContent = 'Kruzly v9';
+    b.textContent = 'Kruzly v10';
     b.style.cssText = 'position:fixed!important;left:8px!important;top:8px!important;z-index:2147483647!important;background:#e53935!important;color:#fff!important;font:bold 28px sans-serif!important;padding:6px 12px!important;pointer-events:none!important;opacity:1!important;visibility:visible!important';
     document.documentElement.appendChild(b);
+    setTimeout(function () { b.style.setProperty('display', 'none', 'important'); }, 4000);
   }
   var revealedLog = {}, revealedCount = 0;
   function reveal() {
@@ -183,6 +187,39 @@
     var top = document.elementFromPoint(cx, cy);
     console.log('[kruzly] v8 cosas mostradas=' + revealedCount + ' encima(' + cx + ',' + cy + ')=' + (top ? top.tagName + '.' + String(top.className || '').slice(0, 40) + ' "' + (top.textContent || '').trim().slice(0, 40) + '"' : 'nada'));
   }, 6000);
+
+  // v10: pantallas de vinculación más cómodas en el teléfono. WhatsApp Web se dibuja
+  // a 1024 px de ancho y en el celular todo se ve diminuto. Mientras no haya sesión
+  // (QR, número, código) se agranda todo con zoom y la tarjeta se ajusta al ancho.
+  var LOGIN_RX = /Enter phone number|Scan to log in|Enter code|Link with phone|Log in with|Ingresa (tu|el) n[uú]mero|Escanea|Introduce el c[oó]digo|Vincular con/i;
+  var LOGIN_ZOOM = 1.8;
+  function mobileLogin() {
+    var logged = document.querySelector('#pane-side, [data-testid="chat-list"], [aria-label="Chat list"], [aria-label="Lista de chats"]');
+    var txt = document.body ? (document.body.innerText || '').slice(0, 1500) : '';
+    var want = (!logged && LOGIN_RX.test(txt)) ? LOGIN_ZOOM : 1;
+    if (zoomNow() !== want) {
+      if (want === 1) document.documentElement.style.removeProperty('zoom');
+      else document.documentElement.style.setProperty('zoom', String(want));
+      force();
+      console.log('[kruzly] zoom ' + want + (logged ? ' (sesión iniciada)' : ''));
+    }
+    if (want !== 1) {
+      var avail = window.innerWidth / want;
+      var all = (document.querySelector('.app-wrapper-web') || document.body).querySelectorAll('div, form');
+      for (var i = 0; i < all.length; i++) {
+        var e = all[i];
+        if (e.offsetWidth > avail - 8 && e.offsetWidth < window.innerWidth + 2 && LOGIN_RX.test((e.textContent || '').slice(0, 400)) && e.offsetHeight < h() - 4) {
+          e.style.setProperty('max-width', (avail - 16) + 'px', 'important');
+          e.style.setProperty('min-width', '0', 'important');
+          e.style.setProperty('box-sizing', 'border-box', 'important');
+          e.style.setProperty('margin-left', 'auto', 'important');
+          e.style.setProperty('margin-right', 'auto', 'important');
+        }
+      }
+    }
+  }
+  try { mobileLogin(); } catch (err) { console.log('[kruzly] zoom: ' + err); }
+  setInterval(function () { try { mobileLogin(); } catch (err) {} }, 1000);
 
   setTimeout(function () {
     var t = force();
