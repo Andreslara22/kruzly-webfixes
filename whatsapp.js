@@ -9,8 +9,9 @@
 // "Link with phone number instead" para ir directo al código.
 // v6: el toque de v5 no se disparaba; ahora busca el texto visible aunque venga
 // partido en varios nodos y toca el elemento clicable con eventos de puntero.
+// v7: v6 tocó un contenedor de toda la página; ahora toca el elemento más pequeño.
 (function () {
-  var V = 'v6';
+  var V = 'v7';
   if (window.__kruzlyFixVersion === V) return;
   window.__kruzlyFixVersion = V;
 
@@ -74,25 +75,45 @@
     e.dispatchEvent(new MouseEvent('mouseup', o));
     e.click();
   }
-  var clicked = false, tries = 0;
-  var clickTimer = setInterval(function () {
-    if (clicked || ++tries > 30) { clearInterval(clickTimer); if (!clicked) console.log('[kruzly] no encontré el botón de número visible'); return; }
-    var walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT), t;
-    while ((t = walker.nextNode())) {
-      var el = t.parentElement;
-      if (!el) continue;
-      // Sube hasta que el texto completo coincida (por si viene partido)
-      var cand = el, k = 0;
-      while (cand && cand !== document.body && !RX.test(cand.textContent || '') && k < 4) { cand = cand.parentElement; k++; }
-      if (!cand || cand === document.body || !RX.test(cand.textContent || '') || (cand.textContent || '').length > 80) continue;
-      if (!visible(cand)) continue;
-      var target = cand.closest('[role="button"], button, a, [tabindex]') || cand;
-      var r = target.getBoundingClientRect();
-      tap(target);
-      clicked = true;
-      console.log('[kruzly] toque automático en ' + target.tagName + ' "' + (target.textContent || '').trim().slice(0, 60) + '" en ' + Math.round(r.left) + ',' + Math.round(r.top));
-      break;
+  // v7: v6 subía hasta un contenedor con tabindex que cubría toda la página.
+  // Ahora se elige el elemento visible MÁS PEQUEÑO cuyo texto sea solo el enlace,
+  // y si tras 2.5 s la pantalla no cambió, se prueba con su padre (máx. 3 intentos).
+  function findLink() {
+    var all = document.body.querySelectorAll('*'), best = null, bestArea = 1e12;
+    for (var i = 0; i < all.length; i++) {
+      var e = all[i], tx = (e.textContent || '').trim();
+      if (tx.length > 60 || !RX.test(tx) || !visible(e)) continue;
+      var r = e.getBoundingClientRect(), a = r.width * r.height;
+      if (a < bestArea) { best = e; bestArea = a; }
     }
+    return best;
+  }
+  function describe(e) {
+    var r = e.getBoundingClientRect();
+    var top = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+    return e.tagName + (e.getAttribute('role') ? '[role=' + e.getAttribute('role') + ']' : '') + ' "' + (e.textContent || '').trim().slice(0, 50) + '" ' +
+      Math.round(r.left) + ',' + Math.round(r.top) + ' ' + Math.round(r.width) + 'x' + Math.round(r.height) +
+      ' encima=' + (top ? top.tagName + '.' + String(top.className || '').slice(0, 30) + ' "' + (top.textContent || '').trim().slice(0, 30) + '"' : 'nada');
+  }
+  var attempts = 0, tries = 0, waiting = false;
+  var clickTimer = setInterval(function () {
+    if (waiting) return;
+    if (++tries > 40 || attempts >= 3) { clearInterval(clickTimer); return; }
+    var link = findLink();
+    if (!link) { if (attempts > 0) { console.log('[kruzly] el enlace ya no está: la pantalla cambió'); clearInterval(clickTimer); } return; }
+    var target = link;
+    for (var up = 0; up < attempts && target.parentElement; up++) {
+      var p = target.parentElement;
+      if ((p.textContent || '').trim().length > 60) break;
+      target = p;
+    }
+    var btn = target.closest('[role="button"], button, a');
+    if (btn && (btn.textContent || '').trim().length <= 60) target = btn;
+    attempts++;
+    console.log('[kruzly] intento ' + attempts + ' toque en ' + describe(target));
+    tap(target);
+    waiting = true;
+    setTimeout(function () { waiting = false; }, 2500);
   }, 800);
 
   setTimeout(function () {
