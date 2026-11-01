@@ -230,8 +230,20 @@
     if (el) { var c = (el.getAttribute('data-link-code') || '').replace(/[^A-Za-z0-9]/g, ''); if (c.length === 8) return c.toUpperCase(); }
     var txt = document.body ? (document.body.innerText || '') : '';
     if (!/Enter code|code on (your )?phone|Introduce (el|este) c[oó]digo|Ingresa (el|este) c[oó]digo/i.test(txt)) return null;
-    var m = txt.replace(/\n/g, '').match(/(?:^|[^A-Za-z0-9])([A-Z0-9]{4})\s*[-–]?\s*([A-Z0-9]{4})(?:[^A-Za-z0-9]|$)/);
-    return m ? m[1] + m[2] : null;
+    // El código puede venir letra por letra en renglones separados: se juntan.
+    var lines = txt.split('\n'), items = [], buf = '';
+    for (var i = 0; i < lines.length; i++) {
+      var ln = lines[i].trim();
+      if (/^[A-Z0-9\-–]$/.test(ln)) { buf += ln; continue; }
+      if (buf) { items.push(buf); buf = ''; }
+      if (ln) items.push(ln);
+    }
+    if (buf) items.push(buf);
+    for (var j = 0; j < items.length; j++) {
+      var m = items[j].replace(/\s+/g, '').match(/^([A-Z0-9]{4})[-–]?([A-Z0-9]{4})$/);
+      if (m && j > 0 && m[1] + m[2] !== 'WHATSAPP') return m[1] + m[2];
+    }
+    return null;
   }
   function copyText(t) {
     var ok = false;
