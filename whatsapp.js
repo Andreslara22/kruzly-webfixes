@@ -9,6 +9,7 @@
 // "Link with phone number instead" para ir directo al código.
 // v6: el toque de v5 no se disparaba; ahora busca el texto visible aunque venga
 // partido en varios nodos y toca el elemento clicable con eventos de puntero.
+// v15: v14 dejó todo en blanco: se quita la vista de una columna y se registra la estructura.
 // v14: vista de celular con sesión: una columna, zoom según el teléfono, botón ‹.
 // v13: no tocar animaciones ni opacidad (trababan el código), sin etiqueta roja.
 // v12: tarjeta de vinculación arriba, sin espacio vacío.
@@ -16,7 +17,7 @@
 // v10: vinculación con zoom para que se lea bien en el teléfono.
 // v7: v6 tocó un contenedor de toda la página; ahora toca el elemento más pequeño.
 (function () {
-  var V = 'v14';
+  var V = 'v15';
   if (window.__kruzlyFixVersion === V) return;
   window.__kruzlyFixVersion = V;
 
@@ -199,7 +200,7 @@
     var logged = document.querySelector('#pane-side, [data-testid="chat-list"], [aria-label="Chat list"], [aria-label="Lista de chats"]');
     var txt = document.body ? (document.body.innerText || '').slice(0, 1500) : '';
     var Z = phoneZoom();
-    var want = logged ? Z : (LOGIN_RX.test(txt) ? Math.min(LOGIN_ZOOM, Z) : 1);
+    var want = logged ? 1 : (LOGIN_RX.test(txt) ? Math.min(LOGIN_ZOOM, Z) : 1); // v15: con sesión, sin zoom (v14 dejó la pantalla en blanco)
     if (zoomNow() !== want) {
       if (want === 1) document.documentElement.style.removeProperty('zoom');
       else document.documentElement.style.setProperty('zoom', String(want));
@@ -288,7 +289,33 @@
     document.documentElement.appendChild(b);
   }
   var lastLayoutLog = '';
+  var lastStruct = '';
+  function describeEl(e) {
+    var r = e.getBoundingClientRect();
+    return e.tagName + (e.id ? '#' + e.id : '') + '.' + String(e.className || '').split(' ').slice(0, 2).join('.') +
+      (e.getAttribute('role') ? '[' + e.getAttribute('role') + ']' : '') + ' ' + Math.round(r.left) + ',' + Math.round(r.top) + ' ' + Math.round(r.width) + 'x' + Math.round(r.height);
+  }
+  // v15: solo diagnóstico de columnas; no cambia nada en pantalla.
+  function logStructure() {
+    var side = document.getElementById('side');
+    if (!side) return;
+    var main = document.querySelector('#main');
+    var key = (main ? 'chat' : 'lista');
+    if (key === lastStruct) return;
+    lastStruct = key;
+    console.log('[kruzly] estructura (' + key + ')');
+    var e = side, n = 0;
+    while (e && e !== document.body && n++ < 10) {
+      var kids = Array.prototype.map.call(e.parentElement ? e.parentElement.children : [], function (c) {
+        return (c === e ? '*' : '') + describeEl(c) + (main && c.contains(main) ? ' [main]' : '');
+      });
+      console.log('[kruzly] n' + n + ' ' + describeEl(e) + ' hermanos: ' + kids.join(' | '));
+      e = e.parentElement;
+    }
+  }
   function mobileChats() {
+    try { logStructure(); } catch (err) { console.log('[kruzly] estructura: ' + err); }
+    return;
     var side = document.getElementById('side') || (document.getElementById('pane-side') || {}).parentElement;
     if (!side) { backButton(false); return; }
     var narrow = (window.innerWidth / zoomNow()) < 700;
