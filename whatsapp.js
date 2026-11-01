@@ -11,7 +11,7 @@
 // partido en varios nodos y toca el elemento clicable con eventos de puntero.
 // v7: v6 tocó un contenedor de toda la página; ahora toca el elemento más pequeño.
 (function () {
-  var V = 'v7';
+  var V = 'v8';
   if (window.__kruzlyFixVersion === V) return;
   window.__kruzlyFixVersion = V;
 
@@ -115,6 +115,65 @@
     waiting = true;
     setTimeout(function () { waiting = false; }, 2500);
   }, 800);
+
+  // v8: la página YA funciona (el toque llevó a "Enter phone number") pero no se pinta.
+  // El hit-test nunca llega al contenido: típico de visibility:hidden / opacity:0 que
+  // WhatsApp quita al terminar una animación de arranque que aquí no termina.
+  // 1) Animaciones y transiciones a 0 s para que lleguen a su estado final.
+  // 2) Forzar visible/opaco lo que siga escondido dentro de la app.
+  // 3) Una etiqueta roja "Kruzly v8" arriba a la izquierda: si NO se ve, el WebView no pinta nada.
+  try {
+    var st = document.createElement('style');
+    st.textContent = '*,*::before,*::after{animation-duration:0s!important;animation-delay:0s!important;transition-duration:0s!important;transition-delay:0s!important}';
+    (document.head || document.documentElement).appendChild(st);
+  } catch (err) { console.log('[kruzly] estilo: ' + err); }
+  function badge() {
+    if (document.getElementById('kruzly-badge')) return;
+    var b = document.createElement('div');
+    b.id = 'kruzly-badge';
+    b.textContent = 'Kruzly v8';
+    b.style.cssText = 'position:fixed!important;left:8px!important;top:8px!important;z-index:2147483647!important;background:#e53935!important;color:#fff!important;font:bold 28px sans-serif!important;padding:6px 12px!important;pointer-events:none!important;opacity:1!important;visibility:visible!important';
+    document.documentElement.appendChild(b);
+  }
+  var revealedLog = {}, revealedCount = 0;
+  function reveal() {
+    badge();
+    var root = document.querySelector('.app-wrapper-web') || document.getElementById('app') || document.body;
+    var chain = root, guard = 0;
+    var list = [];
+    while (chain && chain !== document.documentElement && guard++ < 10) { list.push(chain); chain = chain.parentElement; }
+    var all = root.querySelectorAll('*');
+    for (var i = 0; i < all.length; i++) list.push(all[i]);
+    for (var j = 0; j < list.length; j++) {
+      var e = list[j];
+      if (e.id === 'kruzly-badge') continue;
+      var cs = getComputedStyle(e), why = [];
+      if (cs.display === 'none') continue;
+      if (parseFloat(cs.opacity) < 0.05) { e.style.setProperty('opacity', '1', 'important'); why.push('opacity ' + cs.opacity); }
+      if (cs.visibility === 'hidden' || cs.visibility === 'collapse') { e.style.setProperty('visibility', 'visible', 'important'); why.push('visibility'); }
+      if (cs.contentVisibility && cs.contentVisibility !== 'visible') { e.style.setProperty('content-visibility', 'visible', 'important'); why.push('content-visibility ' + cs.contentVisibility); }
+      if (/matrix\(0, 0, 0, 0|scale\(0/.test(cs.transform)) { e.style.setProperty('transform', 'none', 'important'); why.push('transform ' + cs.transform); }
+      if (cs.clipPath && /inset\(50%|circle\(0/.test(cs.clipPath)) { e.style.setProperty('clip-path', 'none', 'important'); why.push('clip-path'); }
+      if (why.length) {
+        var key = e.tagName + '.' + String(e.className || '').slice(0, 40);
+        if (!revealedLog[key]) {
+          revealedLog[key] = 1; revealedCount++;
+          if (revealedCount <= 12) { var r = e.getBoundingClientRect(); console.log('[kruzly] mostrado ' + key + ' ' + Math.round(r.width) + 'x' + Math.round(r.height) + ' por ' + why.join(', ')); }
+        }
+      }
+    }
+  }
+  try { reveal(); } catch (err) { console.log('[kruzly] reveal: ' + err); }
+  var rTicks = 0;
+  var rTimer = setInterval(function () {
+    try { reveal(); } catch (err) {}
+    if (++rTicks > 40) clearInterval(rTimer);
+  }, 500);
+  setTimeout(function () {
+    var cx = window.innerWidth / 2, cy = 300;
+    var top = document.elementFromPoint(cx, cy);
+    console.log('[kruzly] v8 cosas mostradas=' + revealedCount + ' encima(' + cx + ',' + cy + ')=' + (top ? top.tagName + '.' + String(top.className || '').slice(0, 40) + ' "' + (top.textContent || '').trim().slice(0, 40) + '"' : 'nada'));
+  }, 6000);
 
   setTimeout(function () {
     var t = force();
