@@ -2,12 +2,12 @@
 // La app baja este archivo y lo ejecuta en la página. Después de editarlo,
 // en la app basta con tocar Recargar.
 //
-// v3: la hoja de estilos de v2 no cambió nada (body siguió en 0 px), así que
-// ahora ponemos la altura como estilo en línea con !important sobre body y
-// sus primeros contenedores, lo repetimos si WhatsApp lo vuelve a tocar, y
-// reportamos qué hay en el atributo style y cuánto mide la ventana.
+// v4: v3 sí dio altura a body y al primer div, pero el login vive en OTRO
+// hijo de body cuyos contenedores siguen en 0 px. Ahora forzamos todos los
+// div hijos de body y, además, cada ancestro del texto del login que mida
+// menos de 50 px.
 (function () {
-  var V = 'v3';
+  var V = 'v4';
   if (window.__kruzlyFixVersion === V) return;
   window.__kruzlyFixVersion = V;
 
@@ -16,10 +16,24 @@
   function force() {
     var px = h() + 'px';
     var targets = [document.documentElement, document.body];
-    var d1 = document.body && document.body.querySelector(':scope > div');
-    var d2 = d1 && d1.querySelector(':scope > div');
-    if (d1) targets.push(d1);
-    if (d2) targets.push(d2);
+    if (document.body) {
+      Array.prototype.forEach.call(document.body.children, function (c) {
+        if (c.tagName === 'DIV') {
+          targets.push(c);
+          var inner = c.querySelector(':scope > div');
+          if (inner) targets.push(inner);
+        }
+      });
+      // Ancestros del login que midan 0
+      var walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+      var t, found = null;
+      while ((t = walker.nextNode())) { if (/Link with phone|Scan to log in|Vincular con|Escanea/i.test(t.nodeValue)) { found = t.parentElement; break; } }
+      var e = found, n = 0;
+      while (e && e !== document.body && n < 20) {
+        if (e.getBoundingClientRect().height < 50 && targets.indexOf(e) < 0) targets.push(e);
+        e = e.parentElement; n++;
+      }
+    }
     targets.forEach(function (e) {
       if (!e) return;
       e.style.setProperty('height', px, 'important');
