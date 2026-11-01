@@ -9,6 +9,7 @@
 // "Link with phone number instead" para ir directo al código.
 // v6: el toque de v5 no se disparaba; ahora busca el texto visible aunque venga
 // partido en varios nodos y toca el elemento clicable con eventos de puntero.
+// v23: se desactiva la vista de celular del chat (temblor y caja de texto oculta). Se mantienen zoom, código y vinculación.
 // v22: sin temblor: al cambiar el tamaño solo se reajustan los paneles, no se reescribe ni desplaza la página.
 // v21: el chat deja espacio abajo para los botones de Android (la caja de texto quedaba debajo).
 // v20: en el chat se ocultan capas absolutas vacías (posible origen de la línea vertical).
@@ -24,7 +25,7 @@
 // v10: vinculación con zoom para que se lea bien en el teléfono.
 // v7: v6 tocó un contenedor de toda la página; ahora toca el elemento más pequeño.
 (function () {
-  var V = 'v22';
+  var V = 'v23';
   if (window.__kruzlyFixVersion === V) return;
   window.__kruzlyFixVersion = V;
 
@@ -331,7 +332,8 @@
   //   DIV.two > [ HEADER (barra de iconos, 64 px) | paneles absolutos vacíos | panel de la lista (contiene #side) | panel del chat (contiene #main) ]
   // Solo se tocan 3 piezas: la barra HEADER, el panel de la lista y el panel del chat.
   // Cada una se pone a pantalla completa (position:fixed) o se oculta; nada más se modifica.
-  var chatsDisabled = false, touched = [];
+  // v23: la vista de celular del chat se desactiva: causaba temblor y ocultaba la caja de texto.
+  var chatsDisabled = true, touched = [];
   function kzSet(e, props) {
     if (!e) return;
     for (var k in props) e.style.setProperty(k, props[k], 'important');
