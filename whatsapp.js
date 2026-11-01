@@ -9,6 +9,7 @@
 // "Link with phone number instead" para ir directo al código.
 // v6: el toque de v5 no se disparaba; ahora busca el texto visible aunque venga
 // partido en varios nodos y toca el elemento clicable con eventos de puntero.
+// v17: medidas en px y capa 200 (el panel vacío con z-index 100 tapaba la lista).
 // v16: vista de celular rehecha sobre la estructura real (lista o chat a pantalla completa).
 // v15: v14 dejó todo en blanco: se quita la vista de una columna y se registra la estructura.
 // v14: vista de celular con sesión: una columna, zoom según el teléfono, botón ‹.
@@ -18,7 +19,7 @@
 // v10: vinculación con zoom para que se lea bien en el teléfono.
 // v7: v6 tocó un contenedor de toda la página; ahora toca el elemento más pequeño.
 (function () {
-  var V = 'v16';
+  var V = 'v17';
   if (window.__kruzlyFixVersion === V) return;
   window.__kruzlyFixVersion = V;
 
@@ -329,7 +330,13 @@
     touched.forEach(function (e) { (e.__kz || []).forEach(function (k) { e.style.removeProperty(k); }); e.__kz = []; });
     touched = [];
   }
-  var FULL = { position: 'fixed', left: '0', top: '0', width: '100%', height: '100%', 'max-width': 'none', 'min-width': '0', margin: '0', 'z-index': '50', background: '#fff' };
+  // Medidas exactas en px (con zoom en <html>, "100%" de un elemento fixed salía mal en el WebView).
+  // z-index 200: el panel vacío de la derecha tiene z-index 100 y tapaba la lista; los cajones de WhatsApp (300) quedan encima.
+  function fullBox() {
+    var Z = zoomNow();
+    return { position: 'fixed', left: '0', top: '0', width: Math.floor(window.innerWidth / Z) + 'px', height: Math.floor(window.innerHeight / Z) + 'px',
+      'max-width': 'none', 'min-width': '0', margin: '0', 'z-index': '200', background: '#fff' };
+  }
   var lastMode = '', lastEls = {};
   function mobileChats() {
     try { logStructure(); } catch (err) { console.log('[kruzly] estructura: ' + err); }
@@ -349,18 +356,18 @@
     var chatOpen = !!chatCol && !forcedListFor && chatCol !== listCol;
     var mode = !narrow ? 'ancho' : (chatOpen ? 'chat' : 'lista');
     var sig = mode + '|' + (listCol ? 'L' : '-') + (chatCol ? 'C' : '-');
-    if (sig === lastMode && lastEls.l === listCol && lastEls.c === chatCol && lastEls.z === Z) return;
+    if (sig === lastMode && lastEls.l === listCol && lastEls.c === chatCol && lastEls.z === Z && lastEls.w === window.innerWidth && lastEls.hh === window.innerHeight) return;
     kzClearAll();
-    lastMode = sig; lastEls = { l: listCol, c: chatCol, z: Z };
+    lastMode = sig; lastEls = { l: listCol, c: chatCol, z: Z, w: window.innerWidth, hh: window.innerHeight };
     if (mode === 'ancho') { backButton(false); return; }
     if (!listCol) return;
     kzSet(rail, { display: 'none' });
     if (mode === 'lista') {
-      kzSet(listCol, FULL);
+      kzSet(listCol, fullBox());
       backButton(false);
     } else {
       kzSet(listCol, { display: 'none' });
-      kzSet(chatCol, FULL);
+      kzSet(chatCol, fullBox());
       var hd = document.querySelector('#main header');
       kzSet(hd, { 'padding-left': '44px' });
       backButton(true);
