@@ -9,6 +9,7 @@
 // "Link with phone number instead" para ir directo al código.
 // v6: el toque de v5 no se disparaba; ahora busca el texto visible aunque venga
 // partido en varios nodos y toca el elemento clicable con eventos de puntero.
+// v25: vista de celular reactivada para el build 17 (sin reserva de botones, sin zoom con los dedos).
 // v24: al cambiar el tamaño de la web (teclado) se reajustan las alturas forzadas.
 // v23: se desactiva la vista de celular del chat (temblor y caja de texto oculta). Se mantienen zoom, código y vinculación.
 // v22: sin temblor: al cambiar el tamaño solo se reajustan los paneles, no se reescribe ni desplaza la página.
@@ -26,7 +27,7 @@
 // v10: vinculación con zoom para que se lea bien en el teléfono.
 // v7: v6 tocó un contenedor de toda la página; ahora toca el elemento más pequeño.
 (function () {
-  var V = 'v24';
+  var V = 'v25';
   if (window.__kruzlyFixVersion === V) return;
   window.__kruzlyFixVersion = V;
 
@@ -335,7 +336,8 @@
   // Solo se tocan 3 piezas: la barra HEADER, el panel de la lista y el panel del chat.
   // Cada una se pone a pantalla completa (position:fixed) o se oculta; nada más se modifica.
   // v23: la vista de celular del chat se desactiva: causaba temblor y ocultaba la caja de texto.
-  var chatsDisabled = true, touched = [];
+  // v25: con el build 17 la web ya se ajusta al teclado; se reactiva la vista de celular.
+  var chatsDisabled = false, touched = [];
   function kzSet(e, props) {
     if (!e) return;
     for (var k in props) e.style.setProperty(k, props[k], 'important');
@@ -352,12 +354,16 @@
     var Z = zoomNow();
     // v18: altura de lo visible (sin teclado); el teclado no empuja la página.
     var vh = Math.min(window.innerHeight, (window.visualViewport && window.visualViewport.height) || window.innerHeight);
-    // v21: dejar espacio para los botones de navegación de Android (~56 dp, en px de esta página).
-    vh -= Math.round(56 * window.innerWidth / 412);
     return { position: 'fixed', left: '0', top: '0', width: Math.floor(window.innerWidth / Z) + 'px', height: Math.floor(vh / Z) + 'px',
       'max-width': 'none', 'min-width': '0', margin: '0', 'z-index': '200', background: '#fff', border: '0', 'box-shadow': 'none', overflow: 'hidden' };
   }
   var lastMode = '', lastEls = {};
+  function noPinch(on) {
+    var m = document.querySelector('meta[name=viewport]');
+    if (!m) return;
+    var want = on ? 'width=1024, user-scalable=no' : 'width=1024';
+    if (m.content !== want) m.content = want;
+  }
   function mobileChats() {
     try { logStructure(); } catch (err) { console.log('[kruzly] estructura: ' + err); }
     if (chatsDisabled) return;
@@ -379,6 +385,7 @@
     if (sig === lastMode && lastEls.l === listCol && lastEls.c === chatCol && lastEls.z === Z) return;
     kzClearAll();
     lastMode = sig; lastEls = { l: listCol, c: chatCol, z: Z };
+    noPinch(mode !== 'ancho');
     if (mode === 'ancho') { backButton(false); return; }
     if (!listCol) return;
     kzSet(rail, { display: 'none' });
