@@ -9,12 +9,13 @@
 // "Link with phone number instead" para ir directo al código.
 // v6: el toque de v5 no se disparaba; ahora busca el texto visible aunque venga
 // partido en varios nodos y toca el elemento clicable con eventos de puntero.
+// v13: no tocar animaciones ni opacidad (trababan el código), sin etiqueta roja.
 // v12: tarjeta de vinculación arriba, sin espacio vacío.
 // v11: botón grande para copiar el código de 8 letras.
 // v10: vinculación con zoom para que se lea bien en el teléfono.
 // v7: v6 tocó un contenedor de toda la página; ahora toca el elemento más pequeño.
 (function () {
-  var V = 'v12';
+  var V = 'v13';
   if (window.__kruzlyFixVersion === V) return;
   window.__kruzlyFixVersion = V;
 
@@ -127,12 +128,10 @@
   // 1) Animaciones y transiciones a 0 s para que lleguen a su estado final.
   // 2) Forzar visible/opaco lo que siga escondido dentro de la app.
   // 3) Una etiqueta roja "Kruzly v8" arriba a la izquierda: si NO se ve, el WebView no pinta nada.
-  try {
-    var st = document.createElement('style');
-    st.textContent = '*,*::before,*::after{animation-duration:0s!important;animation-delay:0s!important;transition-duration:0s!important;transition-delay:0s!important}';
-    (document.head || document.documentElement).appendChild(st);
-  } catch (err) { console.log('[kruzly] estilo: ' + err); }
+  // v13: ya NO se ponen las animaciones a 0 s: WhatsApp espera a que terminen
+  // (transitionend) y el código se quedaba cargando.
   function badge() {
+    return;
     if (document.getElementById('kruzly-badge')) return;
     var b = document.createElement('div');
     b.id = 'kruzly-badge';
@@ -155,11 +154,11 @@
       if (e.id === 'kruzly-badge') continue;
       var cs = getComputedStyle(e), why = [];
       if (cs.display === 'none') continue;
-      if (parseFloat(cs.opacity) < 0.05) { e.style.setProperty('opacity', '1', 'important'); why.push('opacity ' + cs.opacity); }
-      if (cs.visibility === 'hidden' || cs.visibility === 'collapse') { e.style.setProperty('visibility', 'visible', 'important'); why.push('visibility'); }
-      if (cs.contentVisibility && cs.contentVisibility !== 'visible') { e.style.setProperty('content-visibility', 'visible', 'important'); why.push('content-visibility ' + cs.contentVisibility); }
-      if (/matrix\(0, 0, 0, 0|scale\(0/.test(cs.transform)) { e.style.setProperty('transform', 'none', 'important'); why.push('transform ' + cs.transform); }
-      if (cs.clipPath && /inset\(50%|circle\(0/.test(cs.clipPath)) { e.style.setProperty('clip-path', 'none', 'important'); why.push('clip-path'); }
+      if (false) { e.style.setProperty('opacity', '1', 'important'); why.push('opacity ' + cs.opacity); }
+      if (false) { e.style.setProperty('visibility', 'visible', 'important'); why.push('visibility'); }
+      if (false) { e.style.setProperty('content-visibility', 'visible', 'important'); why.push('content-visibility ' + cs.contentVisibility); }
+      if (false) { e.style.setProperty('transform', 'none', 'important'); why.push('transform ' + cs.transform); }
+      if (false) { e.style.setProperty('clip-path', 'none', 'important'); why.push('clip-path'); }
       // v9: el login vive dentro de una caja de 28 px con overflow:auto que recorta todo.
       if (/auto|hidden|scroll|clip/.test(cs.overflowY + cs.overflow) && e.clientWidth > 500 && e.clientHeight < 200 && e.scrollHeight > e.clientHeight + 50) {
         var hh = Math.max(e.scrollHeight, h()) + 'px';
