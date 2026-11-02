@@ -9,6 +9,7 @@
 // "Link with phone number instead" para ir directo al código.
 // v6: el toque de v5 no se disparaba; ahora busca el texto visible aunque venga
 // partido en varios nodos y toca el elemento clicable con eventos de puntero.
+// v28: sin zoom de CSS cuando la app ya maqueta al ancho del teléfono (build 18); encabezado sin recorte.
 // v27: línea vertical oculta también en la lista; flecha de regreso discreta (sin círculo verde).
 // v26: freno al reacomodo por cambio de tamaño (bucle que hacía temblar todo).
 // v25: vista de celular reactivada para el build 17 (sin reserva de botones, sin zoom con los dedos).
@@ -29,7 +30,7 @@
 // v10: vinculación con zoom para que se lea bien en el teléfono.
 // v7: v6 tocó un contenedor de toda la página; ahora toca el elemento más pequeño.
 (function () {
-  var V = 'v27';
+  var V = 'v28';
   if (window.__kruzlyFixVersion === V) return;
   window.__kruzlyFixVersion = V;
 
@@ -227,7 +228,7 @@
       force();
       console.log('[kruzly] zoom ' + want + (logged ? ' (sesión iniciada)' : ''));
     }
-    if (want !== 1 && !logged) {
+    if (!logged && window.innerWidth / want < 900) {
       var avail = window.innerWidth / want;
       var all = (document.querySelector('.app-wrapper-web') || document.body).querySelectorAll('div, form');
       for (var i = 0; i < all.length; i++) {
@@ -246,7 +247,7 @@
   // centrado vertical). Se sube: arriba con un margen pequeño.
   var TITLE_RX = /^(Enter phone number|Scan to log in|Enter code on (your )?phone|Steps to log in|Ingresa (tu|el) n[uú]mero.*|Introduce el c[oó]digo.*|Escanea.*)$/i;
   function liftCard() {
-    if (zoomNow() === 1 || document.getElementById('pane-side')) return;
+    if (document.getElementById('pane-side') || window.innerWidth / zoomNow() >= 900) return;
     var title = null, all = document.body.querySelectorAll('h1, h2, div, span');
     for (var i = 0; i < all.length; i++) {
       var e = all[i];
@@ -276,7 +277,12 @@
   // - Si el ancho que queda es de teléfono (< 700 px): una sola columna. Lista de chats a todo
   //   el ancho; al abrir un chat, solo el chat, con un botón ‹ para volver a la lista.
   // - En pantallas anchas (Fold abierto, tablet) se deja el diseño de dos columnas.
+  // v28: desde el build 18 la app maqueta WhatsApp casi al ancho real del teléfono (~420 px).
+  // Entonces NO se usa zoom de CSS: con zoom, 100vh de WhatsApp medía ~3 pantallas, la página
+  // se desplazaba sola y parpadeaba. El zoom queda solo para el build 17 (maqueta de 1024 px).
+  function nativeNarrow() { return window.innerWidth < 900; }
   function phoneZoom() {
+    if (nativeNarrow()) return 1;
     var sw = Math.min(screen.width || 412, screen.height || 9999);
     if (window.innerWidth && screen.width && screen.width > screen.height) sw = screen.width; // horizontal
     return Math.max(1, Math.min(3, 1024 / Math.max(320, sw)));
@@ -308,6 +314,13 @@
     });
     document.documentElement.appendChild(b);
   }
+  // v28: el botón atrás del teléfono (build 18) pregunta aquí primero: si hay un chat abierto
+  // en la vista de celular, vuelve a la lista en vez de salir de WhatsApp.
+  window.__kruzlyBack = function () {
+    var b = document.getElementById('kruzly-back');
+    if (b) { b.click(); return true; }
+    return false;
+  };
   var lastLayoutLog = '';
   var lastStruct = '';
   function describeEl(e) {
@@ -363,7 +376,8 @@
   function noPinch(on) {
     var m = document.querySelector('meta[name=viewport]');
     if (!m) return;
-    var want = on ? 'width=1024, user-scalable=no' : 'width=1024';
+    var w = (m.content.match(/width=(\d+)/) || [0, '1024'])[1];
+    var want = on ? 'width=' + w + ', user-scalable=no' : 'width=' + w;
     if (m.content !== want) m.content = want;
   }
   function mobileChats() {
@@ -373,7 +387,7 @@
     var two = side && side.closest('.two');
     if (!two) { backButton(false); return; }
     var Z = zoomNow();
-    var narrow = Z > 1 && (window.innerWidth / Z) < 700;
+    var narrow = (window.innerWidth / Z) < 700;
     var kids = Array.prototype.slice.call(two.children);
     var listCol = kids.filter(function (c) { return c.contains(side); })[0];
     var main = document.querySelector('#main');
@@ -412,8 +426,7 @@
       kzSet(document.documentElement, { overflow: 'hidden' });
       window.scrollTo(0, 0);
       var hd = document.querySelector('#main header');
-      kzSet(hd, { 'padding-left': '52px' });
-      if (hd && hd.firstElementChild) kzSet(hd.firstElementChild, { 'margin-left': '44px' });
+      kzSet(hd, { 'padding-left': '40px' });
       backButton(true);
     }
     // Red de seguridad: si lo que debería verse no mide nada, se deshace todo y no se vuelve a intentar.
