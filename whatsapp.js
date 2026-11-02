@@ -9,6 +9,7 @@
 // "Link with phone number instead" para ir directo al código.
 // v6: el toque de v5 no se disparaba; ahora busca el texto visible aunque venga
 // partido en varios nodos y toca el elemento clicable con eventos de puntero.
+// v27: línea vertical oculta también en la lista; flecha de regreso discreta (sin círculo verde).
 // v26: freno al reacomodo por cambio de tamaño (bucle que hacía temblar todo).
 // v25: vista de celular reactivada para el build 17 (sin reserva de botones, sin zoom con los dedos).
 // v24: al cambiar el tamaño de la web (teclado) se reajustan las alturas forzadas.
@@ -28,7 +29,7 @@
 // v10: vinculación con zoom para que se lea bien en el teléfono.
 // v7: v6 tocó un contenedor de toda la página; ahora toca el elemento más pequeño.
 (function () {
-  var V = 'v26';
+  var V = 'v27';
   if (window.__kruzlyFixVersion === V) return;
   window.__kruzlyFixVersion = V;
 
@@ -296,8 +297,8 @@
     var z = zoomNow();
     b = document.createElement('div');
     b.id = 'kruzly-back';
-    b.textContent = '‹';
-    b.style.cssText = 'position:fixed!important;left:4px!important;top:12px!important;z-index:2147483646!important;width:34px!important;height:34px!important;border-radius:50%!important;background:#25D366!important;color:#fff!important;font:bold 28px/34px sans-serif!important;text-align:center!important;box-shadow:0 2px 8px rgba(0,0,0,.3)!important;cursor:pointer!important';
+    b.textContent = '←';
+    b.style.cssText = 'position:fixed!important;left:4px!important;top:12px!important;z-index:2147483646!important;width:34px!important;height:34px!important;border-radius:50%!important;background:transparent!important;color:#54656f!important;font:400 30px/34px sans-serif!important;text-align:center!important;box-shadow:none!important;cursor:pointer!important';
     b.addEventListener('click', function () {
       var t = chatTitle();
       var ev = { key: 'Escape', code: 'Escape', keyCode: 27, which: 27, bubbles: true, cancelable: true };
@@ -390,6 +391,14 @@
     if (mode === 'ancho') { backButton(false); return; }
     if (!listCol) return;
     kzSet(rail, { display: 'none' });
+    // v20: ocultar capas absolutas vacías del panel (una de ellas dibuja la línea vertical).
+    kids.forEach(function (c) {
+      if (c === listCol || c === chatCol || c === rail) return;
+      if (c.contains(side) || (main && c.contains(main))) return;
+      if (getComputedStyle(c).position !== 'absolute') return;
+      if ((c.textContent || '').trim().length > 0) return;
+      kzSet(c, { display: 'none' });
+    });
     if (mode === 'lista') {
       kzSet(listCol, fullBox());
       // v26: tampoco se desplaza la página detrás de la lista (el diagnóstico la mostraba movida -858 px).
@@ -401,14 +410,6 @@
       kzSet(chatCol, fullBox());
       // v18: la página no se desplaza (el teclado la subía y ocultaba el campo de texto).
       kzSet(document.documentElement, { overflow: 'hidden' });
-      // v20: ocultar capas absolutas vacías del panel (una de ellas dibuja la línea vertical).
-      kids.forEach(function (c) {
-        if (c === listCol || c === chatCol || c === rail) return;
-        if (c.contains(side) || (main && c.contains(main))) return;
-        if (getComputedStyle(c).position !== 'absolute') return;
-        if ((c.textContent || '').trim().length > 0) return;
-        kzSet(c, { display: 'none' });
-      });
       window.scrollTo(0, 0);
       var hd = document.querySelector('#main header');
       kzSet(hd, { 'padding-left': '52px' });
