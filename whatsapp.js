@@ -9,6 +9,7 @@
 // "Link with phone number instead" para ir directo al código.
 // v6: el toque de v5 no se disparaba; ahora busca el texto visible aunque venga
 // partido en varios nodos y toca el elemento clicable con eventos de puntero.
+// v26: freno al reacomodo por cambio de tamaño (bucle que hacía temblar todo).
 // v25: vista de celular reactivada para el build 17 (sin reserva de botones, sin zoom con los dedos).
 // v24: al cambiar el tamaño de la web (teclado) se reajustan las alturas forzadas.
 // v23: se desactiva la vista de celular del chat (temblor y caja de texto oculta). Se mantienen zoom, código y vinculación.
@@ -27,7 +28,7 @@
 // v10: vinculación con zoom para que se lea bien en el teléfono.
 // v7: v6 tocó un contenedor de toda la página; ahora toca el elemento más pequeño.
 (function () {
-  var V = 'v25';
+  var V = 'v26';
   if (window.__kruzlyFixVersion === V) return;
   window.__kruzlyFixVersion = V;
 
@@ -391,6 +392,9 @@
     kzSet(rail, { display: 'none' });
     if (mode === 'lista') {
       kzSet(listCol, fullBox());
+      // v26: tampoco se desplaza la página detrás de la lista (el diagnóstico la mostraba movida -858 px).
+      kzSet(document.documentElement, { overflow: 'hidden' });
+      window.scrollTo(0, 0);
       backButton(false);
     } else {
       kzSet(listCol, { display: 'none' });
@@ -428,7 +432,27 @@
   }
   // v24: el build 17 achica la web cuando sale el teclado; las alturas forzadas se ajustan al nuevo tamaño
   // (solo escribe si cambia, sin bucles).
-  window.addEventListener('resize', function () { try { force(); resizeBoxes(); } catch (err) {} });
+  // v26: el reacomodo al cambiar el tamaño entraba en bucle (cada reacomodo cambiaba el tamaño
+  // otra vez) y todo temblaba. Ahora se espera a que el tamaño se quede quieto 400 ms, y si
+  // aun así cambia más de 4 veces en 5 s, se deja de reacomodar hasta recargar.
+  var rzTimer = null, rzCount = 0, rzStart = 0, rzFrozen = false, rzLog = [];
+  window.addEventListener('resize', function () {
+    rzLog.push(window.innerWidth + 'x' + window.innerHeight);
+    if (rzLog.length > 8) rzLog.shift();
+    if (rzFrozen) return;
+    clearTimeout(rzTimer);
+    rzTimer = setTimeout(function () {
+      var now = Date.now();
+      if (now - rzStart > 5000) { rzStart = now; rzCount = 0; }
+      if (++rzCount > 4) {
+        rzFrozen = true;
+        console.log('[kruzly] tamaño en bucle, se deja de reacomodar: ' + rzLog.join(' '));
+        return;
+      }
+      try { force(); resizeBoxes(); } catch (err) {}
+      console.log('[kruzly] reacomodo ' + window.innerWidth + 'x' + window.innerHeight);
+    }, 400);
+  });
   var _ml = mobileLogin;
   mobileLogin = function () { _ml(); liftCard(); mobileChats(); };
   try { mobileLogin(); } catch (err) { console.log('[kruzly] zoom: ' + err); }
